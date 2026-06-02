@@ -85,10 +85,22 @@ void calibrateSensors(){
 }
 
 void driveMotors(int left, int right){
-  analogWrite(LEFT_MOTOR_PIN1, left);
-  analogWrite(LEFT_MOTOR_PIN2, 0);
-  analogWrite(RIGHT_MOTOR_PIN1, right);
-  analogWrite(RIGHT_MOTOR_PIN2, 0);
+  // H-bridge: negative speed drives the motor in reverse via the second pin
+  if (left >= 0) {
+    analogWrite(LEFT_MOTOR_PIN1, constrain(left, 0, 255));
+    analogWrite(LEFT_MOTOR_PIN2, 0);
+  } else {
+    analogWrite(LEFT_MOTOR_PIN1, 0);
+    analogWrite(LEFT_MOTOR_PIN2, constrain(-left, 0, 255));
+  }
+
+  if (right >= 0) {
+    analogWrite(RIGHT_MOTOR_PIN1, constrain(right, 0, 255));
+    analogWrite(RIGHT_MOTOR_PIN2, 0);
+  } else {
+    analogWrite(RIGHT_MOTOR_PIN1, 0);
+    analogWrite(RIGHT_MOTOR_PIN2, constrain(-right, 0, 255));
+  }
 }
 
 int checkIntersection(){

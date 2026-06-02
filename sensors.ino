@@ -19,7 +19,7 @@ void loop(){
   // Read sensor values
   uint16_t position = qtr.readLineWhite(sensorValues);
 
-  for(int i = 0; i < sensorCount; i++){
+  for(int i = 0; i < SensorCount; i++){
     Serial.print(sensorValues[i]);
     Serial.print("\t");
   }
