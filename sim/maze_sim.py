@@ -15,7 +15,7 @@ adjacent (row, col) grid cells.
 """
 
 from collections import defaultdict
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from maze_solver import DEAD_END, STRAIGHT_ONLY, choose_direction, encode_intersection, record_and_simplify
 
@@ -57,13 +57,16 @@ class MazeUnsolvableError(RuntimeError):
 
 
 def simulate_phase1(maze: Maze, start: Cell, start_heading: str, goal: Cell,
-                     max_steps: int = 2000) -> Tuple[List[str], int]:
+                     max_steps: int = 2000, trace: Optional[List[Cell]] = None) -> Tuple[List[str], int]:
     """Runs left-hand-rule exploration to the goal. Returns (path, steps)
     where `path` is the live-simplified decision list (mirrors path[] /
     optimizedPath[] in the firmware, since they're built from the same
-    record_and_simplify calls)."""
+    record_and_simplify calls). If `trace` is given, every cell visited
+    (including start and goal) is appended to it in order, for visualization."""
     pos, heading = start, start_heading
     path: List[str] = []
+    if trace is not None:
+        trace.append(pos)
 
     for steps in range(1, max_steps + 1):
         if pos == goal:
@@ -75,6 +78,8 @@ def simulate_phase1(maze: Maze, start: Cell, start_heading: str, goal: Cell,
 
         if itype == STRAIGHT_ONLY:
             pos = _move(pos, heading)
+            if trace is not None:
+                trace.append(pos)
             continue
 
         decision = choose_direction(itype)
@@ -82,16 +87,23 @@ def simulate_phase1(maze: Maze, start: Cell, start_heading: str, goal: Cell,
 
         heading = {'L': left_dir, 'R': right_dir, 'S': straight_dir}.get(decision, BACK[heading])
         pos = _move(pos, heading)
+        if trace is not None:
+            trace.append(pos)
 
     raise MazeUnsolvableError("exploration did not reach the goal within max_steps")
 
 
 def simulate_phase2(maze: Maze, start: Cell, start_heading: str, goal: Cell,
-                     optimized_path: List[str], max_steps: int = 2000) -> int:
+                     optimized_path: List[str], max_steps: int = 2000,
+                     trace: Optional[List[Cell]] = None) -> int:
     """Blindly replays `optimized_path`, consuming one entry per real
-    decision point. Returns the number of steps taken to reach the goal."""
+    decision point. Returns the number of steps taken to reach the goal.
+    If `trace` is given, every cell visited (including start and goal) is
+    appended to it in order, for visualization."""
     pos, heading = start, start_heading
     step_idx = 0
+    if trace is not None:
+        trace.append(pos)
 
     for steps in range(1, max_steps + 1):
         if pos == goal:
@@ -106,11 +118,15 @@ def simulate_phase2(maze: Maze, start: Cell, start_heading: str, goal: Cell,
 
         if itype == STRAIGHT_ONLY or step_idx >= len(optimized_path):
             pos = _move(pos, heading)
+            if trace is not None:
+                trace.append(pos)
             continue
 
         decision = optimized_path[step_idx]
         step_idx += 1
         heading = {'L': left_dir, 'R': right_dir, 'S': straight_dir}.get(decision, BACK[heading])
         pos = _move(pos, heading)
+        if trace is not None:
+            trace.append(pos)
 
     raise MazeUnsolvableError("speed run did not reach the goal within max_steps")
