@@ -14,7 +14,7 @@ from typing import List, Optional
 
 from maze_generator import add_random_loops, bfs_distance, generate_perfect_maze
 from maze_sim import Maze, MazeUnsolvableError, simulate_phase1, simulate_phase2
-from map_optimizer import mapped_path
+from map_optimizer import full_map_path, mapped_path
 from maze_viz import render_run
 
 
@@ -30,20 +30,22 @@ def run_once(rows: int, cols: int, seed: Optional[int], loops: int, heading: str
     edges = build_maze(rows, cols, seed, loops)
     start, goal = (0, 0), (rows - 1, cols - 1)
     result = {'seed': seed, 'optimal': bfs_distance(edges, start, goal),
-              'explore': None, 'speed': None, 'mapped': None, 'error': None}
+              'explore': None, 'speed': None, 'mapped': None, 'full': None, 'extra': None, 'error': None}
     maze = Maze(edges)
     try:
         path, result['explore'] = simulate_phase1(maze, start, heading, goal)
         result['speed'] = simulate_phase2(maze, start, heading, goal, path)
         result['mapped'] = simulate_phase2(maze, start, heading, goal,
                                            mapped_path(maze, start, heading, goal))
+        decisions, result['extra'] = full_map_path(maze, start, heading, goal)
+        result['full'] = simulate_phase2(maze, start, heading, goal, decisions)
     except MazeUnsolvableError as exc:
         result['error'] = str(exc)
     return result
 
 
 def format_batch(results: List[dict]) -> str:
-    lines = [f"{'seed':>6} {'optimal':>8} {'explore':>8} {'speed':>6} {'mapped':>7}  status"]
+    lines = [f"{'seed':>6} {'optimal':>8} {'explore':>8} {'speed':>6} {'mapped':>7} {'full':>5} {'extra':>6}  status"]
     for r in results:
         if r['error']:
             status = f"FAIL: {r['error']}"
@@ -51,11 +53,14 @@ def format_batch(results: List[dict]) -> str:
             status = 'optimal'
         else:
             status = f"+{r['speed'] - r['optimal']} over optimal"
-        lines.append(f"{r['seed']!s:>6} {r['optimal']:>8} {r['explore']!s:>8} {r['speed']!s:>6} {r.get('mapped')!s:>7}  {status}")
+        lines.append(f"{r['seed']!s:>6} {r['optimal']:>8} {r['explore']!s:>8} {r['speed']!s:>6} {r.get('mapped')!s:>7} {r.get('full')!s:>5} {r.get('extra')!s:>6}  {status}")
     ok = [r for r in results if not r['error']]
     optimal = sum(1 for r in ok if r['speed'] == r['optimal'])
     gained = sum(r['speed'] - r['mapped'] for r in ok if r.get('mapped') is not None)
     lines.append(f"map-based replay saves {gained} steps over the left-hand path in total")
+    full_gain = sum(r['speed'] - r['full'] for r in ok if r.get('full') is not None)
+    extra = sum(r['extra'] for r in ok if r.get('extra') is not None)
+    lines.append(f"full-map replay saves {full_gain} steps, costing {extra} extra exploration steps")
     lines.append(f"{len(results)} mazes: {len(ok)} solved, {optimal} optimal, "
                  f"{len(results) - len(ok)} failed")
     return '\n'.join(lines)

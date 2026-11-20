@@ -75,3 +75,62 @@ def mapped_path(maze: Maze, start: Cell, start_heading: str, goal: Cell) -> List
     simulate_phase1(maze, start, start_heading, goal, trace=trace)
     route = shortest_cell_path(explored_graph(trace), start, goal)
     return cells_to_decisions(maze, route, start_heading)
+
+
+def explore_remaining(maze: Maze, trace: List[Cell]) -> Tuple[Dict[Cell, Set[Cell]], int]:
+    """Continue exploring from where phase 1 stopped until every reachable
+    cell has been visited, always walking to the nearest cell that still has
+    an unvisited neighbour. Returns the full map and the extra steps walked.
+    Visiting a cell reveals all its exits, as the line sensors would."""
+    graph = explored_graph(trace)
+    visited: Set[Cell] = set(trace)
+    here = trace[-1]
+    extra = 0
+
+    def neighbours(cell: Cell) -> List[Cell]:
+        return [_move(cell, d) for d in sorted(maze.exits(cell))]
+
+    for cell in visited:
+        for nb in neighbours(cell):
+            graph.setdefault(cell, set()).add(nb)
+            graph.setdefault(nb, set()).add(cell)
+
+    while True:
+        # BFS over visited cells to the nearest one with an unvisited neighbour.
+        prev: Dict[Cell, Optional[Cell]] = {here: None}
+        frontier = deque([here])
+        target = None
+        while frontier:
+            cell = frontier.popleft()
+            if any(nb not in visited for nb in graph[cell]):
+                target = cell
+                break
+            for nb in sorted(graph[cell]):
+                if nb in visited and nb not in prev:
+                    prev[nb] = cell
+                    frontier.append(nb)
+        if target is None:
+            return graph, extra
+        walk = 0
+        cell: Optional[Cell] = target
+        while prev[cell] is not None:
+            cell = prev[cell]
+            walk += 1
+        extra += walk + 1
+        new = min(nb for nb in graph[target] if nb not in visited)
+        visited.add(new)
+        for nb in neighbours(new):
+            graph.setdefault(new, set()).add(nb)
+            graph.setdefault(nb, set()).add(new)
+        here = new
+
+
+def full_map_path(maze: Maze, start: Cell, start_heading: str, goal: Cell) -> Tuple[List[str], int]:
+    """Explore with the left-hand rule, keep exploring until the whole
+    reachable maze is mapped, then return the decision list for the true
+    shortest route plus the extra exploration steps that cost."""
+    trace: List[Cell] = []
+    simulate_phase1(maze, start, start_heading, goal, trace=trace)
+    graph, extra = explore_remaining(maze, trace)
+    route = shortest_cell_path(graph, start, goal)
+    return cells_to_decisions(maze, route, start_heading), extra

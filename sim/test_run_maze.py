@@ -48,5 +48,17 @@ class MainTest(unittest.TestCase):
         self.assertIn('5 mazes: 5 solved, 5 optimal, 0 failed', out)
 
 
+    def test_full_map_column_reaches_optimum_at_extra_cost(self):
+        for seed in range(10):
+            r = run_once(8, 8, seed, 10, 'E')
+            with self.subTest(seed=seed):
+                self.assertEqual(r['full'], r['optimal'])
+                self.assertGreater(r['extra'], 0)
+
+    def test_batch_summary_reports_full_map_totals(self):
+        results = [run_once(6, 6, s, 4, 'E') for s in range(3)]
+        self.assertIn('full-map replay saves', format_batch(results))
+
+
 if __name__ == '__main__':
     unittest.main()
